@@ -12,6 +12,8 @@ class TransferService(accountService: AccountService):
 trait TransferServiceBeans extends Beans :
   def accountService: AccountService
 
+  // We want to shutdown (destroy) the TransferService before the app context is destroyed.
+  // This is why we registerShutDown() this bean.
   lazy val transferService = registerShutDown(new TransferService(accountService)) {
     service =>
       println(s"Shutting down $service")

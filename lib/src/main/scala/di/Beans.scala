@@ -2,6 +2,9 @@ package di
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+ * Beans trait, for this example also shutdown (destroy) lifecycle is implemented.
+ */
 trait Beans:
   private val toShutdown = ArrayBuffer.empty[ShutdownBeans[_]]
 

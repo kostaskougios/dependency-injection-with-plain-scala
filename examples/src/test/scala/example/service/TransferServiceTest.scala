@@ -15,7 +15,9 @@ class TransferServiceTest extends AnyFunSuite :
 
   /**
    * Note how we create a di context for testing by using TransferServiceBeans.
-   * Normally here we would use a mocking framework. (note scalamock is not available for scala 3)
+   * Normally here we would use a mocking framework for accountService but
+   * for simplicity we just create an instance. Potentially we could just
+   * extend AccountServiceBeans if we wanted the prod instance of AccountService
    */
   class App extends TransferServiceBeans :
     lazy val accountService = new AccountService // we could mock it here if needed
