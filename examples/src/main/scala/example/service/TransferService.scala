@@ -12,4 +12,7 @@ class TransferService(accountService: AccountService):
 trait TransferServiceBeans extends Beans :
   def accountService: AccountService
 
-  lazy val transferService = new TransferService(accountService)
+  lazy val transferService = registerShutDown(new TransferService(accountService)) {
+    service =>
+      println(s"Shutting down $service")
+  }
