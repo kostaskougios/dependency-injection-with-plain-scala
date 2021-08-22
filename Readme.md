@@ -190,3 +190,73 @@ class TransferServiceTest extends AnyFunSuite :
   class App extends TransferServiceBeans :
     lazy val accountService = new AccountService // we could mock it here if needed
 ```
+
+## Adding lifecycle to beans
+
+Sometimes beans allocate resources like threads or open files that need to be disposed when the application
+context is destroyed. Some existing DI frameworks offer functionality to destroy the beans. We can implement
+it on our own as well. The idea is to have some sort of way to run code when we need to destroy the
+application context, this can be done i.e. via a `destroy()` method in our beans or via a separate function.
+In this example we will impl the function. We can add the functionality to our 
+[Beans](lib/src/main/scala/di/Beans.scala) trait.
+
+```scala
+trait Beans:
+  // keep track of beans that we need to shutdown
+  private val toShutdown = ArrayBuffer.empty[ShutdownBeans[_]]
+
+  // register a bean so that it is shutdown by withBeansDo()
+  def registerShutDown[B](bean: B)(shutdown: B => Unit): B =
+    toShutdown.synchronized(toShutdown += ShutdownBeans(bean, shutdown))
+    bean
+
+  // run f with the app context and shutdown the beans when done
+  def withBeansDo[R](f: => R): R =
+    try f finally shutdown()
+
+  // shuts down all beans
+  private def shutdown() =
+    for (sb <- toShutdown)
+      try
+        sb.shutdown(sb.bean)
+      catch
+        case e: Throwable => e.printStackTrace()
+
+// keeps track of beans and the code to execute to shutdown those
+private class ShutdownBeans[B](val bean: B, val shutdown: B => Unit)
+```
+
+Now that we have the code to track the beans and destroy them, we can use it in every bean we need to destroy
+before the application context is disposed:
+
+```scala
+trait TransferServiceBeans extends Beans :
+  def accountService: AccountService
+
+  // We want to shutdown (destroy) the TransferService before the app context is destroyed.
+  // This is why we registerShutDown() this bean.
+  lazy val transferService = registerShutDown(new TransferService(accountService)) {
+    service =>
+      println(s"Shutting down $service")
+  }
+```
+
+Whenever we use an app context, we need to make sure we invoke `withBeansDo()` so that beans
+are destroyed, like in [ExampleApp](examples/src/main/scala/example/ExampleApp.scala):
+
+```scala
+@main
+def exampleApp() =
+  new ExampleProdModule :
+    withBeansDo { // <-- makes sure beans are shutdown
+      val results = transferService.transfer("acc2", "acc1", 50)
+      println(s"Transfer results: $results")
+    }
+```
+
+Running the above will print :
+
+```
+Transfer results: TransferResult(Account(acc2,100),Account(acc1,100))
+Shutting down example.service.TransferService@7921b0a2
+```
